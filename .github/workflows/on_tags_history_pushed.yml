@@ -1,0 +1,28 @@
+name: Run Build Workflow(s) From tags-history Branch
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'tags-history'
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - id: set_tags
+        run: |
+          echo "list=$(jq -Rsc 'split("\n")[:-1]' .tags/new.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      list: ${{ steps.set_tags.outputs.list }}
+  call-build:
+    needs: prepare
+    strategy:
+      matrix:
+        tag: ${{ fromJson(needs.prepare.outputs.list) }}
+    uses: ./.github/workflows/build.yml
+    with:
+      tag: ${{ matrix.tag }}

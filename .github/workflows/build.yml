@@ -1,0 +1,261 @@
+name: Run Build Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "paramater for build branch"
+        required: true
+        type: string
+      is_release:
+        description: "whether to create a release"
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      is_release:
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  build:
+    runs-on: windows-2025
+    env:
+      FFMPEG_REPO: FFmpeg/FFmpeg
+      OPENH264_REPO: cisco/openh264
+      FFMPEG_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: out/repo
+      - name: Install powershell-yaml
+        run: Install-Module powershell-yaml -MaximumVersion 0.4 -Force -Scope CurrentUser;
+      - name: Parse Configure Matrix YAML
+        id: parse_config
+        run: |
+          $CONFIG_LIST = ConvertFrom-Yaml -Ordered @'
+          '$_ -lt ([version]"8.0.0")':
+              OPENH264_TAG: '2.5.1'
+              MINGW_PKGS:
+                - zip
+                - mingw-w64-x86_64-gcc
+                - mingw-w64-x86_64-yasm
+                - mingw-w64-x86_64-pkg-config
+                - git
+                - make
+                - diffutils
+                - nasm
+                - mingw-w64-x86_64-dav1d
+                - mingw-w64-x86_64-rav1e
+                - mingw-w64-x86_64-svt-av1
+                - mingw-w64-x86_64-aom
+                - mingw-w64-x86_64-libwebp
+                - mingw-w64-x86_64-libvpx
+                - mingw-w64-x86_64-opus
+                - mingw-w64-x86_64-libvorbis
+              MINGW_U_PKGS:
+                - https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-svt-av1-2.3.0-2-any.pkg.tar.zst
+          '$true':
+              OPENH264_TAG: 'v2.6.0'
+              MINGW_PKGS:
+                - zip
+                - mingw-w64-x86_64-gcc
+                - mingw-w64-x86_64-yasm
+                - mingw-w64-x86_64-pkg-config
+                - git
+                - make
+                - diffutils
+                - nasm
+                - mingw-w64-x86_64-dav1d
+                - mingw-w64-x86_64-rav1e
+                - mingw-w64-x86_64-svt-av1
+                - mingw-w64-x86_64-aom
+                - mingw-w64-x86_64-libwebp
+                - mingw-w64-x86_64-libvpx
+                - mingw-w64-x86_64-opus
+                - mingw-w64-x86_64-libvorbis
+                - mingw-w64-x86_64-svt-av1
+              MINGW_U_PKGS: []
+          '@;
+          $CUR_CONFIG = $CONFIG_LIST.GetEnumerator() | ?{ $exp = $_.Name; &{ $_ = [version]( $env:FFMPEG_TAG -replace '^n(\d+(\.\d+){0,}).*$', '$1' ); iex $exp }} | select -First 1 -ExpandProperty Value;
+          $CUR_CONFIG_JSON = $CUR_CONFIG | ConvertTo-Json -Compress;
+          Write-Host "current config: $CUR_CONFIG_JSON";
+          "CUR_CONFIG=$CUR_CONFIG_JSON" >> $env:GITHUB_OUTPUT;
+          "OPENH264_TAG=$($CUR_CONFIG.OPENH264_TAG)" >> $env:GITHUB_OUTPUT;
+          "ARCHIVE_NAME=ffmpeg-${env:FFMPEG_TAG}-openh264-$($CUR_CONFIG.OPENH264_TAG)-mingw-w64-x86_64.zip" >> $env:GITHUB_ENV;
+        shell: pwsh
+      - name: Checkout openh264 repo with tag ${{ steps.parse_config.outputs.OPENH264_TAG }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.OPENH264_REPO }}
+          ref: ${{ steps.parse_config.outputs.OPENH264_TAG }}
+          path: src/openh264
+      - name: Checkout FFmpeg repo with tag ${{ inputs.tag }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FFMPEG_REPO }}
+          ref: ${{ inputs.tag }}
+          path: src/ffmpeg
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: MINGW64
+          update: true
+          install: ${{ join(fromJson(steps.parse_config.outputs.CUR_CONFIG).MINGW_PKGS, ' ') }}
+      - name: Set up version specific MSYS2 packages
+        shell: msys2 {0}
+        if: ${{ fromJson(steps.parse_config.outputs.CUR_CONFIG).MINGW_U_PKGS && join(fromJson(steps.parse_config.outputs.CUR_CONFIG).MINGW_U_PKGS) != '' }}
+        run: |
+          for pkg in ${{ join(fromJson(steps.parse_config.outputs.CUR_CONFIG).MINGW_U_PKGS, ' ') }}; do
+            pacman --noconfirm -U $pkg
+          done
+      - name: Build openh264
+        shell: msys2 {0}
+        working-directory: src/openh264
+        run: |
+          make
+          make install-shared
+      - name: Build ffmpeg
+        shell: msys2 {0}
+        working-directory: src/ffmpeg
+        run: |
+          export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+          ./configure \
+            --disable-bzlib \
+            --disable-cuda \
+            --disable-cuvid \
+            --disable-debug \
+            --disable-doc \
+            --disable-gpl \
+            --disable-htmlpages \
+            --disable-iconv \
+            --disable-logging \
+            --disable-manpages \
+            --disable-podpages \
+            --disable-postproc \
+            --disable-txtpages \
+            --enable-avdevice \
+            --enable-d3d11va \
+            --enable-dxva2 \
+            --enable-hwaccel=h264_dxva2 \
+            --enable-libopenh264 \
+            --enable-libdav1d \
+            --enable-librav1e \
+            --enable-libsvtav1 \
+            --enable-libaom \
+            --enable-libwebp \
+            --enable-libvpx \
+            --enable-libopus \
+            --enable-libvorbis \
+            --enable-optimizations \
+            --enable-static \
+            --enable-version3 \
+            --enable-optimizations \
+            --extra-ldflags='-static-libgcc -static-libstdc++'
+          make
+          make install
+      - name: Create archive file
+        shell: msys2 {0}
+        working-directory: out
+        run: |
+          outdir=$(pwd)
+          tmpdir=$(mktemp -d)
+          mkdir -p "$tmpdir/bin"
+          cp ./repo/README.md "$tmpdir/README.md"
+          cp ../src/ffmpeg/LICENSE.md "$tmpdir/LICENSE.md"
+          while IFS= read -r pattern; do
+            for file in $pattern; do
+              if [[ -f "$file" ]]; then
+                cp "$file" "$tmpdir/bin/"
+              fi
+            done
+          done <<'EOF'
+          /usr/local/bin/ffmpeg.exe
+          /usr/local/bin/ffprobe.exe
+          /mingw64/bin/libwinpthread-*.dll
+          /mingw64/bin/libvpx-*.dll
+          /mingw64/bin/libaom.dll
+          /mingw64/bin/libogg-*.dll
+          /mingw64/bin/libsharpyuv-*.dll
+          /mingw64/bin/libwebp-*.dll
+          /mingw64/bin/libwebpmux-*.dll
+          /mingw64/bin/librav1e.dll
+          /mingw64/bin/liblzma-*.dll
+          /mingw64/bin/libdav1d-*.dll
+          /mingw64/bin/libSvtAv1Enc-*.dll
+          /mingw64/bin/libopus-*.dll
+          /mingw64/bin/zlib1.dll
+          /mingw64/bin/libvorbis-*.dll
+          /mingw64/bin/libvorbisenc-*.dll
+          EOF
+          pushd "$tmpdir"
+          zip -r "$outdir/$ARCHIVE_NAME" .
+          popd
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-built-${{ env.ARCHIVE_NAME }}
+          path: out/${{ env.ARCHIVE_NAME }}
+          retention-days: 7
+          overwrite: true
+    outputs:
+      OPENH264_TAG: ${{ steps.parse_config.outputs.OPENH264_TAG }}
+      ARCHIVE_NAME: ${{ env.ARCHIVE_NAME }}
+
+  release:
+    needs: build
+    runs-on: windows-2025
+    if: ${{ inputs.is_release }}
+    env:
+      OPENH264_TAG: ${{ needs.build.outputs.OPENH264_TAG }}
+      ARCHIVE_NAME: ${{ needs.build.outputs.ARCHIVE_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: out/repo
+      - name: Download Artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ffmpeg-built-${{ needs.build.outputs.ARCHIVE_NAME }}
+          path: out
+      - name: Test Archive
+        working-directory: out
+        run: |
+          if (!(Test-Path $env:ARCHIVE_NAME)) {
+            Write-Error "Archive file not found: $env:ARCHIVE_NAME";
+            exit 1;
+          }
+          Expand-Archive -LiteralPath $env:ARCHIVE_NAME -DestinationPath .\expand\ -Force;
+          Invoke-WebRequest -Uri http://ciscobinary.openh264.org/openh264-$($env:OPENH264_TAG -replace '^v','')-win64.dll.bz2 -OutFile .\expand\bin\libopenh264.dll.bz2;
+          Invoke-WebRequest -Uri http://ciscobinary.openh264.org/openh264-$($env:OPENH264_TAG -replace '^v','')-win64.dll.signed.md5.txt -OutFile .\expand\bin\libopenh264.dll.signed.md5.txt;
+          7z.exe x .\expand\bin\libopenh264.dll.bz2 -oexpand\bin\;
+          $expected_md5 = ((Get-Content -LiteralPath .\expand\bin\libopenh264.dll.signed.md5.txt -Encoding UTF8 | Select-Object -First 1) -replace '^([a-z0-9]{32}).*$', '$1');
+          $actual_md5 = (Get-FileHash -LiteralPath .\expand\bin\libopenh264.dll -Algorithm MD5).Hash;
+          if ($expected_md5 -ine $actual_md5) {
+            Write-Error "MD5 mismatch: expected $expected_md5, got $actual_md5";
+            exit 1;
+          }
+          Write-Host "MD5 check passed: $actual_md5";
+          Write-Host "Executable files in the archive:";
+          .\expand\bin\ffmpeg.exe -version;
+      - name: Create Release and Upload Asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: out/repo
+        run: |
+          $body = @'
+          [Version ${{ inputs.tag }}](https://github.com/FFmpeg/FFmpeg/releases/tag/${{ inputs.tag }})
+
+          Please download `openh264-*-win64.dll.bz2` from [cisco/openh264 ${{ needs.build.outputs.OPENH264_TAG }}](https://github.com/cisco/openh264/releases/tag/${{ needs.build.outputs.OPENH264_TAG }}), extract it, rename the file to `libopenh264.dll`, and place it in the same directory where you extracted this software.
+          '@;
+
+          gh release create ${{ inputs.tag }} `
+            --title "FFmpeg ${{ inputs.tag }} with openh264 ${{ needs.build.outputs.OPENH264_TAG }}" `
+            --notes "$body" `
+            ..\$env:ARCHIVE_NAME;
