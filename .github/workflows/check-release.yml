@@ -1,0 +1,86 @@
+name: Check Other Repo Tags
+
+on:
+  schedule:
+    - cron: '41 16 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pre_check:
+    name: Pre Checks
+    if: ${{ github.event.inputs.buildOnly != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repo Check
+        if: ${{ github.event_name == 'schedule' }}
+        run: |
+          if [[ "$GITHUB_REPOSITORY" != "advanceboy/ffmpeg-for-openh264-auto-builds" ]]; then
+            echo "To avoid infrastructure overload from parallel builds, please make these changes:"
+            echo "# Required changes for [.github\workflows\check-release.yml](https://github.com/$GITHUB_REPOSITORY/edit/$GITHUB_REF_NAME/.github\workflows\check-release.yml):" >> "$GITHUB_STEP_SUMMARY"
+            echo '1. Adjust the cron schedule numbers (0-59 for minutes, 0-23 for hours)' >> "$GITHUB_STEP_SUMMARY"
+            echo '2. Replace `advanceboy/ffmpeg-for-openh264-auto-builds` with your repository name' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          exit 0
+  check-tags:
+    needs: pre_check
+    runs-on: ubuntu-latest
+    env:
+      FFMPEG_REPO: FFmpeg/FFmpeg  # Target repository to monitor.
+      TAGS_HISTORY_BRANCH: tags-history  # Branch for recording past tags.
+    steps:
+      - name: Checkout history branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAGS_HISTORY_BRANCH }}
+          fetch-depth: 0
+          # Authenticate with the `PERSONAL_ACCESS_TOKEN` defined in Repository secrets to trigger GitHub Actions on `git push`.
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }} 
+
+      - name: Get current tags
+        id: get_tags
+        env:
+          # Use the default GITHUB_TOKEN for another repository access.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # filter tags to 5 or higher major versions (n5.x, n6.x, n7.x, etc.)
+        run: |
+          mkdir -p .tags
+          if [ -f .tags/current.txt ]; then
+            cp .tags/current.txt .tags/previous.txt
+          else
+            touch .tags/previous.txt
+          fi
+          gh api repos/$FFMPEG_REPO/tags --paginate --jq '.[].name | select(test("^n([56789]|\\d{2,})\\."))' | sort -V > .tags/current.txt
+          echo "Current tags:"
+          cat .tags/current.txt
+
+      - name: Compare with previous tags
+        id: compare
+        run: |
+          comm -13 <(sort .tags/previous.txt) <(sort .tags/current.txt) | sort -V > .tags/new.txt
+          echo "New tags:"
+          cat .tags/new.txt || true
+
+          new_count=$(wc -l < .tags/new.txt)
+          echo "count=$new_count" >> $GITHUB_OUTPUT
+
+      - name: Stop if no new tags
+        if: steps.compare.outputs.count == '0'
+        run: |
+          echo "No new tags found. Exiting."
+          exit 0
+
+      - name: Save current tags as previous
+        if: steps.compare.outputs.count != '0'
+        # Use the PERSONAL_ACCESS_TOKEN specified on 'Checkout history branch' step to push changes.
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --allow-unrelated-histories origin/main --no-edit
+          git add .tags/current.txt .tags/new.txt
+          git commit -m "Update current and new tags [bot]"
+          git push origin HEAD:$TAGS_HISTORY_BRANCH
