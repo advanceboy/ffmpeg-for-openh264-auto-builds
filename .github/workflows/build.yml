@@ -39,7 +39,7 @@ jobs:
         id: parse_config
         run: |
           $CONFIG_LIST = ConvertFrom-Yaml -Ordered @'
-          '$_ -lt ([version]"8.0.0")':
+          '$_ -lt ([version]"8.0")':
               OPENH264_TAG: '2.5.1'
               MINGW_PKGS:
                 - zip
@@ -60,6 +60,38 @@ jobs:
                 - mingw-w64-x86_64-libvorbis
               MINGW_U_PKGS:
                 - https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-svt-av1-2.3.0-2-any.pkg.tar.zst
+              FFMPEG_CONFIG_FLAGS:
+                - --disable-bzlib
+                - --disable-cuda
+                - --disable-cuvid
+                - --disable-debug
+                - --disable-doc
+                - --disable-gpl
+                - --disable-htmlpages
+                - --disable-iconv
+                - --disable-logging
+                - --disable-manpages
+                - --disable-podpages
+                - --disable-postproc
+                - --disable-txtpages
+                - --enable-avdevice
+                - --enable-d3d11va
+                - --enable-dxva2
+                - --enable-hwaccel=h264_dxva2
+                - --enable-libopenh264
+                - --enable-libdav1d
+                - --enable-librav1e
+                - --enable-libsvtav1
+                - --enable-libaom
+                - --enable-libwebp
+                - --enable-libvpx
+                - --enable-libopus
+                - --enable-libvorbis
+                - --enable-optimizations
+                - --enable-static
+                - --enable-version3
+                - --enable-optimizations
+                - --extra-ldflags='-static-libgcc -static-libstdc++'
           '$true':
               OPENH264_TAG: 'v2.6.0'
               MINGW_PKGS:
@@ -81,13 +113,45 @@ jobs:
                 - mingw-w64-x86_64-libvorbis
                 - mingw-w64-x86_64-svt-av1
               MINGW_U_PKGS: []
+              FFMPEG_CONFIG_FLAGS:
+                - --disable-bzlib
+                - --disable-cuda
+                - --disable-cuvid
+                - --disable-debug
+                - --disable-doc
+                - --disable-gpl
+                - --disable-htmlpages
+                - --disable-iconv
+                - --disable-logging
+                - --disable-manpages
+                - --disable-podpages
+                - --disable-txtpages
+                - --enable-avdevice
+                - --enable-d3d11va
+                - --enable-dxva2
+                - --enable-hwaccel=h264_dxva2
+                - --enable-libopenh264
+                - --enable-libdav1d
+                - --enable-librav1e
+                - --enable-libsvtav1
+                - --enable-libaom
+                - --enable-libwebp
+                - --enable-libvpx
+                - --enable-libopus
+                - --enable-libvorbis
+                - --enable-optimizations
+                - --enable-static
+                - --enable-version3
+                - --enable-optimizations
+                - --extra-ldflags='-static-libgcc -static-libstdc++'
           '@;
-          $CUR_CONFIG = $CONFIG_LIST.GetEnumerator() | ?{ $exp = $_.Name; &{ $_ = [version]( $env:FFMPEG_TAG -replace '^n(\d+(\.\d+){0,}).*$', '$1' ); iex $exp }} | select -First 1 -ExpandProperty Value;
+          $version_name = $env:FFMPEG_TAG -replace '^(?:.*?/)([^/]+)$', '$1';
+          $CUR_CONFIG = $CONFIG_LIST.GetEnumerator() | ?{ $exp = $_.Name; &{ $_ = [version]( $version_name -replace '^n?(\d+(\.\d+){0,}).*$', '$1' ); iex $exp }} | select -First 1 -ExpandProperty Value;
           $CUR_CONFIG_JSON = $CUR_CONFIG | ConvertTo-Json -Compress;
           Write-Host "current config: $CUR_CONFIG_JSON";
           "CUR_CONFIG=$CUR_CONFIG_JSON" >> $env:GITHUB_OUTPUT;
           "OPENH264_TAG=$($CUR_CONFIG.OPENH264_TAG)" >> $env:GITHUB_OUTPUT;
-          "ARCHIVE_NAME=ffmpeg-${env:FFMPEG_TAG}-openh264-$($CUR_CONFIG.OPENH264_TAG)-mingw-w64-x86_64.zip" >> $env:GITHUB_ENV;
+          "ARCHIVE_NAME=ffmpeg-${version_name}-openh264-$($CUR_CONFIG.OPENH264_TAG)-mingw-w64-x86_64.zip" >> $env:GITHUB_ENV;
         shell: pwsh
       - name: Checkout openh264 repo with tag ${{ steps.parse_config.outputs.OPENH264_TAG }}
         uses: actions/checkout@v4
@@ -126,38 +190,7 @@ jobs:
         working-directory: src/ffmpeg
         run: |
           export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
-          ./configure \
-            --disable-bzlib \
-            --disable-cuda \
-            --disable-cuvid \
-            --disable-debug \
-            --disable-doc \
-            --disable-gpl \
-            --disable-htmlpages \
-            --disable-iconv \
-            --disable-logging \
-            --disable-manpages \
-            --disable-podpages \
-            --disable-postproc \
-            --disable-txtpages \
-            --enable-avdevice \
-            --enable-d3d11va \
-            --enable-dxva2 \
-            --enable-hwaccel=h264_dxva2 \
-            --enable-libopenh264 \
-            --enable-libdav1d \
-            --enable-librav1e \
-            --enable-libsvtav1 \
-            --enable-libaom \
-            --enable-libwebp \
-            --enable-libvpx \
-            --enable-libopus \
-            --enable-libvorbis \
-            --enable-optimizations \
-            --enable-static \
-            --enable-version3 \
-            --enable-optimizations \
-            --extra-ldflags='-static-libgcc -static-libstdc++'
+          ./configure ${{ join(fromJson(steps.parse_config.outputs.CUR_CONFIG).FFMPEG_CONFIG_FLAGS, ' ') }}
           make
           make install
       - name: Create archive file
@@ -167,12 +200,12 @@ jobs:
           outdir=$(pwd)
           tmpdir=$(mktemp -d)
           mkdir -p "$tmpdir/bin"
-          cp ./repo/README.md "$tmpdir/README.md"
-          cp ../src/ffmpeg/LICENSE.md "$tmpdir/LICENSE.md"
+          cp -p ./repo/README.md "$tmpdir/README.md"
+          cp -p ../src/ffmpeg/LICENSE.md "$tmpdir/LICENSE.md"
           while IFS= read -r pattern; do
             for file in $pattern; do
               if [[ -f "$file" ]]; then
-                cp "$file" "$tmpdir/bin/"
+                cp -p "$file" "$tmpdir/bin/"
               fi
             done
           done <<'EOF'
