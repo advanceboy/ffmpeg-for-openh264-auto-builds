@@ -101,6 +101,10 @@ jobs:
             <<: *COMMON_CONFIG
             OPENH264_TAG: 'v2.7.0'
             MINGW_U_PKGS: []
+            MINGW_EXTRA_PKGS:
+              - mingw-w64-x86_64-whisper.cpp
+            FFMPEG_EXTRA_CONFIG_FLAGS:
+              - --enable-whisper
           '@;
           $version_name = $env:FFMPEG_TAG -replace '^(?:.*?/)([^/]+)$', '$1';
           $CUR_CONFIG = $CONFIG_LIST.GetEnumerator() | ?{ $exp = $_.Name; &{ $_ = [version]( $version_name -replace '^n?(\d+(\.\d+){0,}).*$', '$1' ); iex $exp }} | select -First 1 -ExpandProperty Value;
