@@ -112,6 +112,7 @@ jobs:
                 - mingw-w64-x86_64-opus
                 - mingw-w64-x86_64-libvorbis
                 - mingw-w64-x86_64-svt-av1
+                - mingw-w64-x86_64-whisper.cpp
               MINGW_U_PKGS: []
               FFMPEG_CONFIG_FLAGS:
                 - --disable-bzlib
@@ -139,6 +140,7 @@ jobs:
                 - --enable-libvpx
                 - --enable-libopus
                 - --enable-libvorbis
+                - --enable-whisper
                 - --enable-optimizations
                 - --enable-static
                 - --enable-version3
