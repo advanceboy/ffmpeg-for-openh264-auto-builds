@@ -228,6 +228,15 @@ jobs:
           /mingw64/bin/zlib1.dll
           /mingw64/bin/libvorbis-*.dll
           /mingw64/bin/libvorbisenc-*.dll
+          /mingw64/bin/libgcc_s_seh-*.dll
+          /mingw64/bin/libstdc++-*.dll
+          /mingw64/bin/libquadmath-*.dll
+          /mingw64/bin/libgfortran-*.dll
+          /mingw64/bin/libopenblas.dll
+          /mingw64/bin/libgomp-*.dll
+          /mingw64/bin/ggml-*.dll
+          /mingw64/bin/ggml.dll
+          /mingw64/bin/libwhisper-*.dll
           EOF
           pushd "$tmpdir"
           zip -r "$outdir/$ARCHIVE_NAME" .
