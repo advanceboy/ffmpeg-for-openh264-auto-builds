@@ -196,6 +196,15 @@ jobs:
           /ucrt64/bin/zlib1.dll
           /ucrt64/bin/libvorbis-*.dll
           /ucrt64/bin/libvorbisenc-*.dll
+          /ucrt64/bin/libgcc_s_seh-*.dll
+          /ucrt64/bin/libstdc++-*.dll
+          /ucrt64/bin/libquadmath-*.dll
+          /ucrt64/bin/libgfortran-*.dll
+          /ucrt64/bin/libopenblas.dll
+          /ucrt64/bin/libgomp-*.dll
+          /ucrt64/bin/ggml-*.dll
+          /ucrt64/bin/ggml.dll
+          /ucrt64/bin/libwhisper-*.dll
           EOF
           pushd "$tmpdir"
           zip -r "$outdir/$ARCHIVE_NAME" .
