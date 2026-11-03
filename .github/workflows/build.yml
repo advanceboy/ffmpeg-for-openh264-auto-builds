@@ -42,22 +42,22 @@ jobs:
           '$false': &COMMON_CONFIG
             MINGW_PKGS:
               - zip
-              - mingw-w64-x86_64-gcc
-              - mingw-w64-x86_64-yasm
-              - mingw-w64-x86_64-pkg-config
+              - mingw-w64-ucrt-x86_64-gcc
+              - mingw-w64-ucrt-x86_64-yasm
+              - mingw-w64-ucrt-x86_64-pkgconf
               - git
               - make
               - diffutils
               - nasm
-              - mingw-w64-x86_64-dav1d
-              - mingw-w64-x86_64-rav1e
-              - mingw-w64-x86_64-svt-av1
-              - mingw-w64-x86_64-aom
-              - mingw-w64-x86_64-libwebp
-              - mingw-w64-x86_64-libvpx
-              - mingw-w64-x86_64-lame
-              - mingw-w64-x86_64-opus
-              - mingw-w64-x86_64-libvorbis
+              - mingw-w64-ucrt-x86_64-dav1d
+              - mingw-w64-ucrt-x86_64-rav1e
+              - mingw-w64-ucrt-x86_64-svt-av1
+              - mingw-w64-ucrt-x86_64-aom
+              - mingw-w64-ucrt-x86_64-libwebp
+              - mingw-w64-ucrt-x86_64-libvpx
+              - mingw-w64-ucrt-x86_64-lame
+              - mingw-w64-ucrt-x86_64-opus
+              - mingw-w64-ucrt-x86_64-libvorbis
             FFMPEG_CONFIG_FLAGS:
               - --disable-bzlib
               - --disable-cuda
@@ -95,7 +95,7 @@ jobs:
             OPENH264_TAG: '2.5.1'
             OPENH264_CHECKSUM_ALGORITHM: MD5
             MINGW_U_PKGS:
-              - https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-svt-av1-2.3.0-2-any.pkg.tar.zst
+              - https://repo.msys2.org/mingw/ucrt64/mingw-w64-ucrt-x86_64-svt-av1-2.3.0-2-any.pkg.tar.zst
             FFMPEG_EXTRA_CONFIG_FLAGS:
               - --disable-postproc
           '$true':
@@ -119,7 +119,7 @@ jobs:
           "CUR_CONFIG=$CUR_CONFIG_JSON" >> $env:GITHUB_OUTPUT;
           "OPENH264_TAG=$($CUR_CONFIG.OPENH264_TAG)" >> $env:GITHUB_OUTPUT;
           "OPENH264_CHECKSUM_ALGORITHM=$($CUR_CONFIG.OPENH264_CHECKSUM_ALGORITHM)" >> $env:GITHUB_OUTPUT;
-          "ARCHIVE_NAME=ffmpeg-${version_name}-openh264-$($CUR_CONFIG.OPENH264_TAG)-mingw-w64-x86_64.zip" >> $env:GITHUB_ENV;
+          "ARCHIVE_NAME=ffmpeg-${version_name}-openh264-$($CUR_CONFIG.OPENH264_TAG)-mingw-w64-ucrt-x86_64.zip" >> $env:GITHUB_ENV;
         shell: pwsh
       - name: Checkout openh264 repo with tag ${{ steps.parse_config.outputs.OPENH264_TAG }}
         uses: actions/checkout@v4
@@ -137,7 +137,7 @@ jobs:
         uses: msys2/setup-msys2@v2
         id: msys2
         with:
-          msystem: MINGW64
+          msystem: ucrt64
           update: true
           install: ${{ join(fromJson(steps.parse_config.outputs.CUR_CONFIG).MINGW_PKGS, ' ') }}
       - name: Set up version specific MSYS2 packages
@@ -179,22 +179,22 @@ jobs:
           done <<'EOF'
           /usr/local/bin/ffmpeg.exe
           /usr/local/bin/ffprobe.exe
-          /mingw64/bin/libwinpthread-*.dll
-          /mingw64/bin/libvpx-*.dll
-          /mingw64/bin/libaom.dll
-          /mingw64/bin/libogg-*.dll
-          /mingw64/bin/libsharpyuv-*.dll
-          /mingw64/bin/libwebp-*.dll
-          /mingw64/bin/libwebpmux-*.dll
-          /mingw64/bin/librav1e.dll
-          /mingw64/bin/liblzma-*.dll
-          /mingw64/bin/libdav1d-*.dll
-          /mingw64/bin/libSvtAv1Enc-*.dll
-          /mingw64/bin/libmp3lame-*.dll
-          /mingw64/bin/libopus-*.dll
-          /mingw64/bin/zlib1.dll
-          /mingw64/bin/libvorbis-*.dll
-          /mingw64/bin/libvorbisenc-*.dll
+          /ucrt64/bin/libwinpthread-*.dll
+          /ucrt64/bin/libvpx-*.dll
+          /ucrt64/bin/libaom.dll
+          /ucrt64/bin/libogg-*.dll
+          /ucrt64/bin/libsharpyuv-*.dll
+          /ucrt64/bin/libwebp-*.dll
+          /ucrt64/bin/libwebpmux-*.dll
+          /ucrt64/bin/librav1e.dll
+          /ucrt64/bin/liblzma-*.dll
+          /ucrt64/bin/libdav1d-*.dll
+          /ucrt64/bin/libSvtAv1Enc-*.dll
+          /ucrt64/bin/libmp3lame-*.dll
+          /ucrt64/bin/libopus-*.dll
+          /ucrt64/bin/zlib1.dll
+          /ucrt64/bin/libvorbis-*.dll
+          /ucrt64/bin/libvorbisenc-*.dll
           EOF
           pushd "$tmpdir"
           zip -r "$outdir/$ARCHIVE_NAME" .
