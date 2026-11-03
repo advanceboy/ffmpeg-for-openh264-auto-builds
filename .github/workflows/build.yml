@@ -99,7 +99,7 @@ jobs:
               - --disable-postproc
           '$true':
             <<: *COMMON_CONFIG
-            OPENH264_TAG: 'v2.6.0'
+            OPENH264_TAG: 'v2.7.0'
             MINGW_U_PKGS: []
           '@;
           $version_name = $env:FFMPEG_TAG -replace '^(?:.*?/)([^/]+)$', '$1';
