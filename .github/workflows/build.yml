@@ -116,7 +116,7 @@ jobs:
           Write-Host "current config: $CUR_CONFIG_JSON";
           "CUR_CONFIG=$CUR_CONFIG_JSON" >> $env:GITHUB_OUTPUT;
           "OPENH264_TAG=$($CUR_CONFIG.OPENH264_TAG)" >> $env:GITHUB_OUTPUT;
-          "ARCHIVE_NAME=ffmpeg-${version_name}-openh264-$($CUR_CONFIG.OPENH264_TAG)-mingw-w64-x86_64.zip" >> $env:GITHUB_ENV;
+          "ARCHIVE_NAME=ffmpeg-${version_name}-openh264-$($CUR_CONFIG.OPENH264_TAG)-mingw-w64-ucrt-x86_64.zip" >> $env:GITHUB_ENV;
         shell: pwsh
       - name: Checkout openh264 repo with tag ${{ steps.parse_config.outputs.OPENH264_TAG }}
         uses: actions/checkout@v7
