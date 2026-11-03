@@ -93,13 +93,15 @@ jobs:
           '$_ -lt ([version]"8.0")':
             <<: *COMMON_CONFIG
             OPENH264_TAG: '2.5.1'
+            OPENH264_CHECKSUM_ALGORITHM: MD5
             MINGW_U_PKGS:
               - https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-svt-av1-2.3.0-2-any.pkg.tar.zst
             FFMPEG_EXTRA_CONFIG_FLAGS:
               - --disable-postproc
           '$true':
             <<: *COMMON_CONFIG
-            OPENH264_TAG: 'v2.6.0'
+            OPENH264_TAG: 'v2.7.0'
+            OPENH264_CHECKSUM_ALGORITHM: SHA256
             MINGW_U_PKGS: []
           '@;
           $version_name = $env:FFMPEG_TAG -replace '^(?:.*?/)([^/]+)$', '$1';
@@ -116,6 +118,7 @@ jobs:
           Write-Host "current config: $CUR_CONFIG_JSON";
           "CUR_CONFIG=$CUR_CONFIG_JSON" >> $env:GITHUB_OUTPUT;
           "OPENH264_TAG=$($CUR_CONFIG.OPENH264_TAG)" >> $env:GITHUB_OUTPUT;
+          "OPENH264_CHECKSUM_ALGORITHM=$($CUR_CONFIG.OPENH264_CHECKSUM_ALGORITHM)" >> $env:GITHUB_OUTPUT;
           "ARCHIVE_NAME=ffmpeg-${version_name}-openh264-$($CUR_CONFIG.OPENH264_TAG)-mingw-w64-x86_64.zip" >> $env:GITHUB_ENV;
         shell: pwsh
       - name: Checkout openh264 repo with tag ${{ steps.parse_config.outputs.OPENH264_TAG }}
@@ -205,6 +208,7 @@ jobs:
           overwrite: true
     outputs:
       OPENH264_TAG: ${{ steps.parse_config.outputs.OPENH264_TAG }}
+      OPENH264_CHECKSUM_ALGORITHM: ${{ steps.parse_config.outputs.OPENH264_CHECKSUM_ALGORITHM }}
       ARCHIVE_NAME: ${{ env.ARCHIVE_NAME }}
 
   release:
@@ -213,6 +217,7 @@ jobs:
     if: ${{ inputs.is_release }}
     env:
       OPENH264_TAG: ${{ needs.build.outputs.OPENH264_TAG }}
+      OPENH264_CHECKSUM_ALGORITHM: ${{ needs.build.outputs.OPENH264_CHECKSUM_ALGORITHM }}
       ARCHIVE_NAME: ${{ needs.build.outputs.ARCHIVE_NAME }}
     steps:
       - uses: actions/checkout@v4
@@ -231,16 +236,21 @@ jobs:
             exit 1;
           }
           Expand-Archive -LiteralPath $env:ARCHIVE_NAME -DestinationPath .\expand\ -Force;
-          Invoke-WebRequest -Uri http://ciscobinary.openh264.org/openh264-$($env:OPENH264_TAG -replace '^v','')-win64.dll.bz2 -OutFile .\expand\bin\libopenh264.dll.bz2;
-          Invoke-WebRequest -Uri http://ciscobinary.openh264.org/openh264-$($env:OPENH264_TAG -replace '^v','')-win64.dll.signed.md5.txt -OutFile .\expand\bin\libopenh264.dll.signed.md5.txt;
+          $openh264_version = $env:OPENH264_TAG -replace '^v','';
+          $hash_algorithm = $env:OPENH264_CHECKSUM_ALGORITHM;
+          $binary_uri = "https://ciscobinary.openh264.org/openh264-$openh264_version-win64.dll";
+          $signature_path = ".\expand\bin\libopenh264.dll.signed.$($hash_algorithm.ToLowerInvariant()).txt";
+          Invoke-WebRequest -Uri "$binary_uri.bz2" -OutFile .\expand\bin\libopenh264.dll.bz2;
+          Invoke-WebRequest -Uri "$binary_uri.signed.$($hash_algorithm.ToLowerInvariant()).txt" -OutFile $signature_path;
           7z.exe x .\expand\bin\libopenh264.dll.bz2 -oexpand\bin\;
-          $expected_md5 = ((Get-Content -LiteralPath .\expand\bin\libopenh264.dll.signed.md5.txt -Encoding UTF8 | Select-Object -First 1) -replace '^([a-z0-9]{32}).*$', '$1');
-          $actual_md5 = (Get-FileHash -LiteralPath .\expand\bin\libopenh264.dll -Algorithm MD5).Hash;
-          if ($expected_md5 -ine $actual_md5) {
-            Write-Error "MD5 mismatch: expected $expected_md5, got $actual_md5";
+          $checksum_content = Get-Content -LiteralPath $signature_path -Raw -Encoding UTF8;
+          $expected_hash = [regex]::Match($checksum_content, '(?i)[a-f0-9]{32,64}').Value;
+          $actual_hash = (Get-FileHash -LiteralPath .\expand\bin\libopenh264.dll -Algorithm $hash_algorithm).Hash;
+          if ($expected_hash -ine $actual_hash) {
+            Write-Error "$hash_algorithm mismatch: expected $expected_hash, got $actual_hash";
             exit 1;
           }
-          Write-Host "MD5 check passed: $actual_md5";
+          Write-Host "$hash_algorithm check passed: $actual_hash";
           Write-Host "Executable files in the archive:";
           .\expand\bin\ffmpeg.exe -version;
       - name: Create Release and Upload Asset
