@@ -30,7 +30,7 @@ jobs:
       OPENH264_REPO: cisco/openh264
       FFMPEG_TAG: ${{ inputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: out/repo
       - name: Install powershell-yaml
@@ -119,13 +119,13 @@ jobs:
           "ARCHIVE_NAME=ffmpeg-${version_name}-openh264-$($CUR_CONFIG.OPENH264_TAG)-mingw-w64-ucrt-x86_64.zip" >> $env:GITHUB_ENV;
         shell: pwsh
       - name: Checkout openh264 repo with tag ${{ steps.parse_config.outputs.OPENH264_TAG }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.OPENH264_REPO }}
           ref: ${{ steps.parse_config.outputs.OPENH264_TAG }}
           path: src/openh264
       - name: Checkout FFmpeg repo with tag ${{ inputs.tag }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.FFMPEG_REPO }}
           ref: ${{ inputs.tag }}
@@ -197,7 +197,7 @@ jobs:
           zip -r "$outdir/$ARCHIVE_NAME" .
           popd
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-built-${{ env.ARCHIVE_NAME }}
           path: out/${{ env.ARCHIVE_NAME }}
@@ -215,11 +215,11 @@ jobs:
       OPENH264_TAG: ${{ needs.build.outputs.OPENH264_TAG }}
       ARCHIVE_NAME: ${{ needs.build.outputs.ARCHIVE_NAME }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: out/repo
       - name: Download Artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: ffmpeg-built-${{ needs.build.outputs.ARCHIVE_NAME }}
           path: out

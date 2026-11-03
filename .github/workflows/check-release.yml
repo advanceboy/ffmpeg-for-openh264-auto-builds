@@ -33,7 +33,7 @@ jobs:
       TAGS_HISTORY_BRANCH: tags-history  # Branch for recording past tags.
     steps:
       - name: Checkout history branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.TAGS_HISTORY_BRANCH }}
           fetch-depth: 0
