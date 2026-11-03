@@ -55,6 +55,7 @@ jobs:
               - mingw-w64-x86_64-aom
               - mingw-w64-x86_64-libwebp
               - mingw-w64-x86_64-libvpx
+              - mingw-w64-x86_64-lame
               - mingw-w64-x86_64-opus
               - mingw-w64-x86_64-libvorbis
             FFMPEG_CONFIG_FLAGS:
@@ -81,6 +82,7 @@ jobs:
               - --enable-libaom
               - --enable-libwebp
               - --enable-libvpx
+              - --enable-libmp3lame
               - --enable-libopus
               - --enable-libvorbis
               - --enable-optimizations
@@ -181,6 +183,7 @@ jobs:
           /mingw64/bin/liblzma-*.dll
           /mingw64/bin/libdav1d-*.dll
           /mingw64/bin/libSvtAv1Enc-*.dll
+          /mingw64/bin/libmp3lame-*.dll
           /mingw64/bin/libopus-*.dll
           /mingw64/bin/zlib1.dll
           /mingw64/bin/libvorbis-*.dll
